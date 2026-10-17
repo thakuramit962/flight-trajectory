@@ -121,14 +121,6 @@ export default function App() {
     bootedRef.current = true;
 
     void (async () => {
-      if (!token.trim()) {
-        await loadSample();
-        setStatus({
-          kind: "notice",
-          message: "No API token configured — showing bundled demo data.",
-        });
-        return;
-      }
       const result = await loadApi();
       if (!result.ok) {
         await loadSample();
