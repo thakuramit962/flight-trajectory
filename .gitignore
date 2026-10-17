@@ -5,3 +5,6 @@ dist
 .DS_Store
 *.log
 .npm-cache
+.gh-config
+.vercel-config
+.vercel
