@@ -1,6 +1,7 @@
 import { config } from "../config";
 
 export const SAMPLE_URL = "/sample/daily-data-response.json";
+const PROXY_URL = "/api/telemetry";
 
 /** Converts a date-picker value (yyyy-mm-dd) to the API's dd-mm-yyyy format. */
 export function toApiDate(isoDate: string): string {
@@ -24,6 +25,12 @@ interface FetchDailyArgs {
   signal?: AbortSignal;
 }
 
+interface ProxyArgs {
+  uin: string;
+  apiDate: string;
+  signal?: AbortSignal;
+}
+
 function apiErrorMessage(payload: unknown): string | null {
   if (typeof payload !== "object" || payload === null) return null;
   const data = (payload as { data?: unknown }).data;
@@ -40,12 +47,15 @@ function apiErrorMessage(payload: unknown): string | null {
   return null;
 }
 
-export async function fetchDailyData({ uin, apiDate, token, signal }: FetchDailyArgs): Promise<unknown> {
-  if (!token.trim()) {
-    throw new Error("No API token configured. Open Settings and paste the bearer token.");
+function readError(payload: unknown, status: number): string {
+  if (typeof payload === "object" && payload !== null && "error" in payload) {
+    const message = (payload as { error?: unknown }).error;
+    if (typeof message === "string" && message.trim()) return message;
   }
-  if (!uin.trim()) throw new Error("Enter a drone UIN.");
+  return `Request failed (HTTP ${status}).`;
+}
 
+async function fetchDirect({ uin, apiDate, token, signal }: FetchDailyArgs): Promise<unknown> {
   let response: Response;
   try {
     response = await fetch(`${config.apiBase}/fetchapi/data`, {
@@ -66,16 +76,57 @@ export async function fetchDailyData({ uin, apiDate, token, signal }: FetchDaily
 
   const text = await response.text();
   if (!response.ok) {
-    const hint = response.status === 401 || response.status === 403 ? " The bearer token was rejected." : "";
+    const hint =
+      response.status === 401 || response.status === 403 ? " The bearer token was rejected." : "";
     throw new Error(`API request failed (HTTP ${response.status}).${hint}`);
   }
 
-  let payload: unknown;
   try {
-    payload = JSON.parse(text) as unknown;
+    return JSON.parse(text) as unknown;
   } catch {
     throw new Error("API returned a response that is not valid JSON.");
   }
+}
+
+/**
+ * Production deployments call the serverless proxy so the bearer token stays on the server.
+ * Local development (and anyone who saved a token in Settings) calls the API directly.
+ */
+async function fetchViaProxy({ uin, apiDate, signal }: ProxyArgs): Promise<unknown> {
+  let response: Response;
+  try {
+    response = await fetch(PROXY_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ uin: uin.trim(), date: apiDate }),
+      signal,
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") throw error;
+    throw new Error("Could not reach the telemetry proxy (/api/telemetry).");
+  }
+
+  const text = await response.text();
+  let payload: unknown = null;
+  if (text) {
+    try {
+      payload = JSON.parse(text) as unknown;
+    } catch {
+      throw new Error(`Telemetry proxy returned invalid JSON (HTTP ${response.status}).`);
+    }
+  }
+  if (!response.ok) throw new Error(readError(payload, response.status));
+  return payload;
+}
+
+export async function fetchDailyData(args: FetchDailyArgs): Promise<unknown> {
+  const { uin, apiDate, token, signal } = args;
+  if (!uin.trim()) throw new Error("Enter a drone UIN.");
+
+  const payload =
+    !token.trim() && import.meta.env.PROD
+      ? await fetchViaProxy({ uin, apiDate, signal })
+      : await fetchDirect({ uin, apiDate, token, signal });
 
   const apiError = apiErrorMessage(payload);
   if (apiError) throw new Error(apiError);

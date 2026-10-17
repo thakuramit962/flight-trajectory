@@ -30,22 +30,24 @@ in a banner, so the map is never empty.
 
 ## Deploy to Vercel
 
-The repo is Vercel-ready (`vercel.json` pins the Vite build). Import the GitHub repo in Vercel, or
-run `npx vercel --prod`.
+The repo is Vercel-ready (`vercel.json` pins the Vite build) and ships a serverless proxy in
+`api/telemetry.js`, so the bearer token never reaches the browser bundle.
 
-Set these environment variables in the Vercel project (Settings → Environment Variables):
+1. Import the GitHub repo at vercel.com/new (framework: Vite), or run `npx vercel --prod`.
+2. Add the environment variables below in Settings → Environment Variables, then redeploy.
 
-| Variable | Value |
-| --- | --- |
-| `VITE_API_TOKEN` | the bearer token from the API |
-| `VITE_UIN` | default drone UIN (optional) |
-| `VITE_DATE` | default date, `yyyy-mm-dd` (optional) |
-| `VITE_API_BASE` | `https://apidata.iotechworld.com` (optional) |
+| Variable | Where | Value |
+| --- | --- | --- |
+| `API_TOKEN` | server (proxy) | bearer token for the telemetry API |
+| `API_BASE` | server (optional) | defaults to `https://apidata.iotechworld.com` |
+| `VITE_UIN` | build (optional) | default drone UIN shown in the header |
+| `VITE_DATE` | build (optional) | default date, `yyyy-mm-dd` |
+| `VITE_API_TOKEN` | build (optional) | only for a token-in-bundle direct mode; leave empty when using the proxy |
 
-`VITE_*` values are compiled into the bundle at build time, so a deployment without
-`VITE_API_TOKEN` still works but starts in demo mode. Because the token is baked into client
-JavaScript, keep it read-only or proxy the API through a serverless function before making the
-deployment public.
+Data path: the browser posts `{ uin, date }` to `/api/telemetry`; the function attaches
+`Authorization: Bearer $API_TOKEN`, validates `uin`/`date`, forwards to the upstream API and returns
+its JSON unchanged. Local `npm run dev` skips the proxy and calls the API directly with
+`VITE_API_TOKEN` from `.env` (serverless functions are not served by the Vite dev server).
 
 ## API
 

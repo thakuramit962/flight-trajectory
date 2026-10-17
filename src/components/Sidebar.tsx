@@ -248,11 +248,14 @@ export function Sidebar(props: SidebarProps) {
                       rows={3}
                       value={token}
                       onChange={(event) => onTokenChange(event.target.value)}
-                      placeholder="Paste the JWT from the cURL request"
+                      placeholder="Optional: paste a JWT to override the server proxy"
                       spellCheck={false}
                     />
                     <div className="setting__row">
-                      <span className="setting__hint">Stored in this browser only.</span>
+                      <span className="setting__hint">
+                        Hosted builds use a server-side proxy. A token here overrides it in this
+                        browser only.
+                      </span>
                       <button type="button" className="btn btn--small" onClick={onSaveToken}>
                         Save &amp; reload
                       </button>
