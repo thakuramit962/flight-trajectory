@@ -28,6 +28,25 @@ The first load calls the live API with the date/UIN from `.env`. If the call fai
 rejected token), the app falls back to the bundled sample in `public/sample/` and explains why
 in a banner, so the map is never empty.
 
+## Deploy to Vercel
+
+The repo is Vercel-ready (`vercel.json` pins the Vite build). Import the GitHub repo in Vercel, or
+run `npx vercel --prod`.
+
+Set these environment variables in the Vercel project (Settings → Environment Variables):
+
+| Variable | Value |
+| --- | --- |
+| `VITE_API_TOKEN` | the bearer token from the API |
+| `VITE_UIN` | default drone UIN (optional) |
+| `VITE_DATE` | default date, `yyyy-mm-dd` (optional) |
+| `VITE_API_BASE` | `https://apidata.iotechworld.com` (optional) |
+
+`VITE_*` values are compiled into the bundle at build time, so a deployment without
+`VITE_API_TOKEN` still works but starts in demo mode. Because the token is baked into client
+JavaScript, keep it read-only or proxy the API through a serverless function before making the
+deployment public.
+
 ## API
 
 `POST https://apidata.iotechworld.com/fetchapi/data`
