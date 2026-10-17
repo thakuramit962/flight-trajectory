@@ -8,3 +8,4 @@ dist
 .gh-config
 .vercel-config
 .vercel
+.env*

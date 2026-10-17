@@ -1,0 +1,15 @@
+# Never upload local secrets or build artefacts to Vercel.
+.env
+.env.local
+.env.*.local
+
+node_modules
+dist
+docs
+
+.gh-config
+.vercel-config
+.vercel
+.npm-cache
+*.log
+.DS_Store
