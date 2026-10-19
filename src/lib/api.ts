@@ -1,5 +1,3 @@
-import { config } from "../config";
-
 export const SAMPLE_URL = "/sample/daily-data-response.json";
 const PROXY_URL = "/api/telemetry";
 
@@ -22,12 +20,6 @@ interface FetchDailyArgs {
   /** dd-mm-yyyy */
   apiDate: string;
   token: string;
-  signal?: AbortSignal;
-}
-
-interface ProxyArgs {
-  uin: string;
-  apiDate: string;
   signal?: AbortSignal;
 }
 
@@ -55,49 +47,21 @@ function readError(payload: unknown, status: number): string {
   return `Request failed (HTTP ${status}).`;
 }
 
-async function fetchDirect({ uin, apiDate, token, signal }: FetchDailyArgs): Promise<unknown> {
-  let response: Response;
-  try {
-    response = await fetch(`${config.apiBase}/fetchapi/data`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token.trim()}`,
-      },
-      body: JSON.stringify({ uin: uin.trim(), date: apiDate }),
-      signal,
-    });
-  } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") throw error;
-    throw new Error(
-      `Could not reach ${config.apiBase}. Check the network connection or the API base URL.`,
-    );
-  }
-
-  const text = await response.text();
-  if (!response.ok) {
-    const hint =
-      response.status === 401 || response.status === 403 ? " The bearer token was rejected." : "";
-    throw new Error(`API request failed (HTTP ${response.status}).${hint}`);
-  }
-
-  try {
-    return JSON.parse(text) as unknown;
-  } catch {
-    throw new Error("API returned a response that is not valid JSON.");
-  }
-}
-
 /**
- * Production deployments call the serverless proxy so the bearer token stays on the server.
- * Local development (and anyone who saved a token in Settings) calls the API directly.
+ * Every request goes through `/api/telemetry` (Vite middleware in dev, a Vercel function in
+ * production). The bearer token lives in server-side env; a token saved in Settings is forwarded
+ * as a header for that one call. This keeps the browser same-origin and immune to upstream CORS.
  */
-async function fetchViaProxy({ uin, apiDate, signal }: ProxyArgs): Promise<unknown> {
+async function postTelemetry({ uin, apiDate, token, signal }: FetchDailyArgs): Promise<unknown> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const override = token.trim();
+  if (override) headers["x-api-token"] = override;
+
   let response: Response;
   try {
     response = await fetch(PROXY_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ uin: uin.trim(), date: apiDate }),
       signal,
     });
@@ -120,14 +84,10 @@ async function fetchViaProxy({ uin, apiDate, signal }: ProxyArgs): Promise<unkno
 }
 
 export async function fetchDailyData(args: FetchDailyArgs): Promise<unknown> {
-  const { uin, apiDate, token, signal } = args;
+  const { uin } = args;
   if (!uin.trim()) throw new Error("Enter a drone UIN.");
 
-  const payload =
-    !token.trim() && import.meta.env.PROD
-      ? await fetchViaProxy({ uin, apiDate, signal })
-      : await fetchDirect({ uin, apiDate, token, signal });
-
+  const payload = await postTelemetry(args);
   const apiError = apiErrorMessage(payload);
   if (apiError) throw new Error(apiError);
   return payload;

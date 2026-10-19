@@ -6,6 +6,8 @@
  *
  * Required environment variable (Vercel → Project → Settings → Environment Variables):
  *   API_TOKEN   bearer token for apidata.iotechworld.com
+ *
+* A request header `x-api-token` overrides it for a single call (used by the Settings field).
  * Optional:
  *   API_BASE    defaults to https://apidata.iotechworld.com
  */
@@ -37,7 +39,9 @@ export default async function handler(req, res) {
     return send(res, 405, { error: "Method not allowed. Use POST." });
   }
 
-  const token = (process.env.API_TOKEN || "").trim();
+  const override =
+    req.headers && typeof req.headers["x-api-token"] === "string" ? req.headers["x-api-token"].trim() : "";
+  const token = override || (process.env.API_TOKEN || "").trim();
   if (!token) {
     return send(res, 500, {
       error: "API_TOKEN is not configured on the server. Add it in the Vercel project settings.",

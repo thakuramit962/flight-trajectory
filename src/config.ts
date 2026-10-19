@@ -1,5 +1,5 @@
 export interface AppConfig {
-  apiBase: string;
+  /** Token typed in Settings for this browser only; the server-side proxy supplies the default. */
   token: string;
   uin: string;
   /** ISO date (yyyy-mm-dd) used by the date picker. */
@@ -7,7 +7,6 @@ export interface AppConfig {
 }
 
 const TOKEN_STORAGE_KEY = "agri-flight-map.token";
-const TOKEN_PLACEHOLDER = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...";
 
 function readRuntimeToken(): string {
   try {
@@ -26,12 +25,12 @@ export function saveRuntimeToken(token: string): void {
   }
 }
 
-/** Runtime token (saved from the UI) wins over the build-time .env value. */
+/**
+ * No token is read from the build: the bearer token stays in server env (`API_TOKEN`) and is
+ * attached by `/api/telemetry`, so it can never be extracted from the JavaScript bundle.
+ */
 export const config: AppConfig = {
-  apiBase: (import.meta.env.VITE_API_BASE as string | undefined) ?? "https://apidata.iotechworld.com",
-  token: readRuntimeToken() || ((import.meta.env.VITE_API_TOKEN as string | undefined) ?? ""),
+  token: readRuntimeToken(),
   uin: (import.meta.env.VITE_UIN as string | undefined) ?? "UA00FUGD0TC",
   date: (import.meta.env.VITE_DATE as string | undefined) ?? "2026-10-16",
 };
-
-export { TOKEN_PLACEHOLDER, TOKEN_STORAGE_KEY };

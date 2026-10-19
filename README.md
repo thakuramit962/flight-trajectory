@@ -44,10 +44,14 @@ The repo is Vercel-ready (`vercel.json` pins the Vite build) and ships a serverl
 | `VITE_DATE` | build (optional) | default date, `yyyy-mm-dd` |
 | `VITE_API_TOKEN` | build (optional) | only for a token-in-bundle direct mode; leave empty when using the proxy |
 
-Data path: the browser posts `{ uin, date }` to `/api/telemetry`; the function attaches
+Data path: the browser posts `{ uin, date }` to `/api/telemetry`; the handler attaches
 `Authorization: Bearer $API_TOKEN`, validates `uin`/`date`, forwards to the upstream API and returns
-its JSON unchanged. Local `npm run dev` skips the proxy and calls the API directly with
-`VITE_API_TOKEN` from `.env` (serverless functions are not served by the Vite dev server).
+its JSON unchanged. The browser never calls the upstream host directly, so there is no CORS
+preflight and no token in client JavaScript.
+
+`npm run dev` mounts the same `api/telemetry.js` handler as Vite middleware, reading
+`VITE_API_TOKEN` / `VITE_API_BASE` from `.env` on the dev server. Dev and production therefore use
+one code path.
 
 ## API
 
@@ -118,6 +122,15 @@ src/
   components/Legend.tsx   colour legend overlay
 public/sample/            bundled 16-10-2026 response used as a fallback
 ```
+
+## Troubleshooting
+
+**`504 Gateway Time-out` from the API, shown in the browser as a CORS error.**
+The upstream nginx returns a 504 without CORS headers when its data backend stalls, which browsers
+report as `No 'Access-Control-Allow-Origin' header`. The proxy turns that into a JSON error and the
+app falls back to demo data with an explanatory banner. Nothing to fix client-side: with a valid
+token the upstream answers instantly when healthy (an invalid token returns `404 Partner not found`
+in ~0.3 s), so a 60 s hang means the telemetry backend itself is stuck.
 
 ## Notes
 
